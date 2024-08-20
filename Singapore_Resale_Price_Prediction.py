@@ -75,7 +75,7 @@ with col3:
         st.markdown('<br>',unsafe_allow_html=True)
         getpricebut = st.button('Check Price')
         if(getpricebut):
-            with open('trained_model_regress','rb') as f:
+            with open('newmodel','rb') as f:                
                 getmodel = pickle.load(f)
             inputpd = pd.DataFrame({'year':[int(getyear)], 'flat_type':[getflattype], 'storey_range':[getstorey], 'floor_area_sqm':[getfloorarea], 'flat_model':[getflatmodel], 'flat_age':[getflatage]})
             getout = int(getmodel.predict(inputpd))
