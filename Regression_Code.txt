@@ -1,0 +1,214 @@
+import pandas as pd
+import numpy as np
+import re
+import pickle
+import matplotlib.pyplot as plt
+import seaborn as sns
+import xgboost as xgb
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (mean_squared_error,mean_absolute_error,root_mean_squared_error,r2_score)
+from sklearn.linear_model import (LinearRegression,LogisticRegression)
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import (RandomForestRegressor,GradientBoostingRegressor)
+
+#---------------------------------------------Exploratory Data Analysis---------------------------------------------
+
+getdata1 = pd.read_csv('19901999.csv')
+getdata2 = pd.read_csv('20002012.csv')
+getdata3 = pd.read_csv('20122014.csv')
+getdata4 = pd.read_csv('20152016.csv')
+getdata5 = pd.read_csv('2017onwards.csv')
+
+getpd = pd.concat([getdata1,getdata2,getdata3,getdata4,getdata5],axis=0,ignore_index=True)
+
+copypd = getpd.copy()
+copypd['remaining_lease'] = copypd['remaining_lease'].replace(np.nan,0)
+copypd.insert(9,'flat_age',copypd['year'] - copypd['lease_commence_date'])
+
+#---------------------------------------------Feature Selection---------------------------------------------
+
+copypd.drop(['month','town','lease_commence_date','block','street_name','remaining_lease'],axis=1,inplace=True)
+
+#---------------------------------------------Label Encoding---------------------------------------------
+
+encoder = LabelEncoder()
+copypd['flat_type'] = encoder.fit_transform(copypd['flat_type'])
+copypd['storey_range'] = encoder.fit_transform(copypd['storey_range'])
+copypd['flat_model'] = encoder.fit_transform(copypd['flat_model'])
+
+#-------------------------------------Outliers Treatment & Correction-------------------------------------
+
+q3 = copypd['storey_range'].quantile(0.75)
+q1 = copypd['storey_range'].quantile(0.25)
+iqr = q3 - q1
+maxval = q3 + (iqr * 1.5)
+for i in copypd[copypd['storey_range'] > maxval].index:
+    copypd.drop(i,inplace=True)
+
+q3 = copypd['floor_area_sqm'].quantile(0.75)
+q1 = copypd['floor_area_sqm'].quantile(0.25)
+iqr = q3 - q1
+maxval = q3 + (iqr * 1.5)
+for i in copypd[copypd['floor_area_sqm'] > maxval].index:
+    copypd.drop(i,inplace=True)
+
+q3 = copypd['flat_age'].quantile(0.75)
+q1 = copypd['flat_age'].quantile(0.25)
+iqr = q3 - q1
+maxval = q3 + (iqr * 1.5)
+for i in copypd[copypd['flat_age'] > maxval].index:
+    copypd.drop(i,inplace=True)
+
+q3 = copypd['resale_price'].quantile(0.75)
+q1 = copypd['resale_price'].quantile(0.25)
+iqr = q3 - q1
+maxval = q3 + (iqr * 1.5)
+for i in copypd[copypd['resale_price'] > maxval].index:
+    copypd.drop(i,inplace=True)
+
+q3 = copypd['floor_area_sqm'].quantile(0.75)
+q1 = copypd['floor_area_sqm'].quantile(0.25)
+iqr = q3 - q1
+maxval = q3 + (iqr * 1.5)
+for i in copypd[copypd['floor_area_sqm'] >= maxval].index:
+    copypd.loc[i,'floor_area_sqm'] = maxval
+
+q3 = copypd['resale_price'].quantile(0.75)
+q1 = copypd['resale_price'].quantile(0.25)
+iqr = q3 - q1
+maxval = q3 + (iqr * 1.5)
+for i in copypd[copypd['resale_price'] >= maxval].index:
+    copypd.loc[i,'resale_price'] = maxval
+
+#---------------------------------------------Scaling Values using Standard Scaler---------------------------------------------
+
+scaler = StandardScaler()
+testpd = pd.DataFrame(scaler.fit_transform(copypd))
+testpd.columns = ['year', 'flat_type', 'storey_range', 'floor_area_sqm', 'flat_model', 'flat_age', 'resale_price']
+
+#-------------------------------------Outliers Treatment & Correction-------------------------------------
+
+q3 = testpd['flat_age'].quantile(0.75)
+q1 = testpd['flat_age'].quantile(0.25)
+iqr = q3 - q1
+maxval = q3 + (iqr * 1.5)
+for i in testpd[testpd['flat_age'] > maxval].index:
+    testpd.loc[i,'flat_age'] = maxval
+
+#---------------------------------------------Testing on Various Models---------------------------------------------
+
+X = testpd.iloc[:,:6]
+Y = testpd.iloc[:,6]
+
+#------------- Multiple Linear Regression
+
+X_train, X_test, Y_train, Y_test = train_test_split(X,Y,test_size=0.2)
+getmodel = LinearRegression().fit(X_train,Y_train)
+Y_pred = getmodel.predict(X_test)
+print('Mean Squared Error : ',mean_squared_error(Y_test,Y_pred))
+print('Mean Absolute Error : ',mean_absolute_error(Y_test,Y_pred))
+print('Root Mean Squared Error : ',root_mean_squared_error(Y_test,Y_pred))
+print('R2 Score : ',r2_score(Y_test,Y_pred))
+
+# Results - (MSE : 0.2255, MAE : 0.361, RMSE : 0.4749, R-square Error : 0.776)
+
+#------------- Polynomial Regression
+
+X_train, X_test, Y_train, Y_test = train_test_split(X,Y,test_size=0.2)
+
+poly_model = PolynomialFeatures(degree=7)
+X_poly_train = poly_model.fit_transform(X_train)
+X_poly_test = poly_model.fit_transform(X_test)
+poly_model.fit(X_poly_train,Y_train)
+
+getmodel = LinearRegression().fit(X_poly_train,Y_train)
+Y_pred = getmodel.predict(X_poly_test)
+print('Mean Squared Error : ',mean_squared_error(Y_test,Y_pred))
+print('Mean Absolute Error : ',mean_absolute_error(Y_test,Y_pred))
+print('Root Mean Squared Error : ',root_mean_squared_error(Y_test,Y_pred))
+print('R2 Score : ',r2_score(Y_test,Y_pred))
+
+# Results - (MSE : 0.1048, MAE : 0.2351, RMSE : 0.3237, R-square Error : 0.896)
+
+#------------- KNN Regression
+
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=0.2)
+getmodel = KNeighborsRegressor(n_neighbors=50).fit(X_train,Y_train)
+Y_pred = getmodel.predict(X_test)
+print('Mean Squared Error : ', mean_squared_error(Y_test,Y_pred))
+print('Mean Absolute Error : ',mean_absolute_error(Y_test,Y_pred))
+print('Root Mean Square Error : ',root_mean_squared_error(Y_test,Y_pred))
+print('R Square Error : ',r2_score(Y_test,Y_pred))
+
+# Results - (MSE : 0.0923, MAE : 0.2101, RMSE : 0.3039, R-square Error : 0.908)
+
+#------------- Decision Tree Regression
+
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=0.2)
+getmodel = DecisionTreeRegressor().fit(X_train,Y_train)
+Y_pred = getmodel.predict(X_test)
+print('Mean Squared Error : ', mean_squared_error(Y_test,Y_pred))
+print('Mean Absolute Error : ',mean_absolute_error(Y_test,Y_pred))
+print('Root Mean Square Error : ',root_mean_squared_error(Y_test,Y_pred))
+print('R Square Error : ',r2_score(Y_test,Y_pred))
+
+# Results - (MSE : 0.0942, MAE : 0.2024, RMSE : 0.307, R-square Error : 0.906)
+
+#------------- Random Forest Regression
+
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=0.2)
+getmodel = RandomForestRegressor().fit(X_train,Y_train)
+Y_pred = getmodel.predict(X_test)
+print('Mean Squared Error : ', mean_squared_error(Y_test,Y_pred))
+print('Mean Absolute Error : ',mean_absolute_error(Y_test,Y_pred))
+print('Root Mean Square Error : ',root_mean_squared_error(Y_test,Y_pred))
+print('R Square Error : ',r2_score(Y_test,Y_pred))
+
+# Results - (MSE : 0.0818, MAE : 0.193, RMSE : 0.286, R-square Error : 0.918)
+
+#------------- Gradient Boosting Regression
+
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=0.2)
+getmodel = GradientBoostingRegressor(learning_rate=0.8).fit(X_train,Y_train)
+Y_pred = getmodel.predict(X_test)
+print('Mean Squared Error : ', mean_squared_error(Y_test,Y_pred))
+print('Mean Absolute Error : ',mean_absolute_error(Y_test,Y_pred))
+print('Root Mean Square Error : ',root_mean_squared_error(Y_test,Y_pred))
+print('R Square Error : ',r2_score(Y_test,Y_pred))
+
+# Results - (MSE : 0.0948, MAE : 0.2159, RMSE : 0.3078, R-square Error : 0.906)
+
+#------------- Extreme Gradient Boosting Regression
+
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=0.2)
+getmodel = xgb.XGBRFRegressor().fit(X_train,Y_train)
+Y_pred = getmodel.predict(X_test)
+print('Mean Squared Error : ', mean_squared_error(Y_test,Y_pred))
+print('Mean Absolute Error : ',mean_absolute_error(Y_test,Y_pred))
+print('Root Mean Square Error : ',root_mean_squared_error(Y_test,Y_pred))
+print('R Square Error : ',r2_score(Y_test,Y_pred))
+
+# Results - (MSE : 0.1323, MAE : 0.2642, RMSE : 0.3637, R-square Error : 0.868)
+
+*****************************************************************************************************************************************************************
+
+Selected Regressor : Random Forest Regressor (MSE : 0.0818, MAE : 0.193, RMSE : 0.286, R-square Error : 0.918)
+
+#---------------------------------------------Inverse Scaling Values using Standard Scaler---------------------------------------------
+
+testpd = pd.DataFrame(scaler.inverse_transform(copypd))
+testpd.columns = ['year', 'flat_type', 'storey_range', 'floor_area_sqm', 'flat_model', 'flat_age', 'resale_price']
+
+#---------------------------------------------Dumping Trained Model---------------------------------------------
+
+X = testpd.iloc[:,:6]
+Y = testpd.iloc[:,6]
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=0.2)
+getmodel = RandomForestRegressor().fit(X_train,Y_train)
+
+with open('trained_model_regress','wb') as f:
+    pickle.dump(getmodel,f)
