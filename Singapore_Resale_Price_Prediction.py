@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import datetime
 import pickle
-import gzip
 import time
 from PIL import Image
 from sklearn.preprocessing import (LabelEncoder,StandardScaler)
@@ -76,8 +75,6 @@ with col3:
         st.markdown('<br>',unsafe_allow_html=True)
         getpricebut = st.button('Check Price')
         if(getpricebut):
-            with gzip.open('newmodel','rb') as f:                
-                getmodel = f.read()
             inputpd = pd.DataFrame({'year':[int(getyear)], 'flat_type':[getflattype], 'storey_range':[getstorey], 'floor_area_sqm':[getfloorarea], 'flat_model':[getflatmodel], 'flat_age':[getflatage]})
             getout = int(getmodel.predict(inputpd))
             with st.spinner('Calculating'):
