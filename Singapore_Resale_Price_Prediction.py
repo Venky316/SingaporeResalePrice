@@ -77,7 +77,7 @@ with col3:
         getpricebut = st.button('Check Price')
         if(getpricebut):
             with gzip.open('newmodel','rb') as f:                
-                getmodel = pickle.load(f)
+                getmodel = f.read()
             inputpd = pd.DataFrame({'year':[int(getyear)], 'flat_type':[getflattype], 'storey_range':[getstorey], 'floor_area_sqm':[getfloorarea], 'flat_model':[getflatmodel], 'flat_age':[getflatage]})
             getout = int(getmodel.predict(inputpd))
             with st.spinner('Calculating'):
